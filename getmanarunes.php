@@ -1,6 +1,9 @@
 <?php 
 require_once('hhb_.inc.php');
+require_once('hhb_datatypes.inc.php');
+require_once('LoginWithPHP.php');
 init();
+//$socket=LogInAndReturnSocketHandle(89999999,"autoaccount","Rxst Ymstptmoi");while(1){sleep(3);};
 class CreateCharacterException extends Exception{};
 class CharacterNameAlreadyExistsException extends CreateCharacterException{};
 class TooManyCharactersOnAccountException extends CreateCharacterException{};
@@ -17,14 +20,66 @@ $password="autoaccount";
 //var_dump(getRandomAccountsWithFreeCharacterSlots());return;
 //var_dump(getFreeCharacterSlotsOnAccount('39582939'));return;
 //var_dump(getRandomLegalCharacterName(),GetRandomLegalCharacterName(),GetRandomLegalCharacterName());return;
-var_dump(createRandomCharactersOnRandomAccounts());return;
+//var_dump(createRandomCharactersOnRandomAccounts());return;
+//var_dump(robCharacter(89999999,'autoaccount','Rxst Ymstptmoi'));return;
+var_dump(robRandomCharacter());return;
 
 
 
 
+function robRandomCharacter(){
+	global $dbc;
+	$stm=$dbc->prepare('SELECT `accounts`.`accountname` AS `accountame`, `accounts`.`password` AS `password`, `characters`.`charactername` AS `charactername` FROM `accounts` INNER JOIN `characters` ON `accounts`.`id` = `characters`.`accounts_id` WHERE `characters`.`is_robbed` = 0');
+	$stm->execute();
+	//var_dump($stm->fetchAll(PDO::FETCH_ASSOC));
+	$acc=$stm->fetch(PDO::FETCH_ASSOC);
+	if($acc===false){
+		throw new Exception("All characters in db are robbed already!");
+		}
+	return robCharacter($acc['accountname'],$acc['password'],$acc['charactername']);
+	}
 
+function robCharacter($accountname,$password,$charactername){
+	$characterNameExistsInDb=doesCharacterNameExistInDb($charactername);
+	if($characterNameExistsInDb){
+		if(isCharacterRobbed($charactername)){
+			throw new Exception($charactername." is already robbed!");
+			}
+	}
+	$socket=LogInAndReturnSocketHandle($accountname,$password,$charactername);
+	$packets=array();
+	$packets[]=hex2bin('0A0082FFFF030000330B0000');//open backpack.
+	$packets[]=hex2bin('0F0078FFFF400005550C05AA04F4010701');//throw manarune on floor hidden V
+	$packets[]=hex2bin('0F0078FFFF4000025A0C02AC04F0010701');//throw UH rune on floor hidden >
+	$packets[]=hex2bin('0F0078FFFF400001EC0B01A204F0010701');//throw life ring hidden <<
+	$packets[]=hex2bin('0F0078FFFF020000F10B00AA04EC010701');//throw AOL ^
+	$packets[]=hex2bin('0F0078FFFF030000330B00A804F2010701');//throw backpack 1 step to south.
+	$packets[]=hex2bin('010014');//explicit logout packet (although close socket also works..);
+	$sentTotal=0;
+	foreach($packets as $packet){
+	//echo "sending: ".bin2hex($packet).PHP_EOL.PHP_EOL;
+	$sentTotal+=$sent=socket_write($socket,$packet,strlen($packet));
+	usleep(80000);
+	//^not sure why we need to sleep, but if we send too fast, some packets never arrive :S
+	//usleep(50000);
+	}
+	global $dbc;
+	$stm=$dbc->prepare('UPDATE `characters` SET `is_robbed` = 1 WHERE `charactername` = ?');
+	$stm->execute(array($charactername));
+	return true;
+}
 
-
+function isCharacterRobbed($charactername){
+	if(!doesCharacterNameExistInDb($charactername)){
+		return false;//far as we know, nope.
+		}
+	global $dbc;
+	$stm=$dbc->prepare("SELECT `is_robbed` FROM `characters` WHERE `charactername` = ?");
+	$stm->execute(array($charactername));
+	$res=$stm->fetch(PDO::FETCH_ASSOC);
+	$res=!!(int)$res['is_robbed'];
+	return $res;
+}
 function createRandomCharactersOnRandomAccounts(){
 	global $dbc;
 	$charactersCreated=0;
@@ -237,6 +292,14 @@ function doesAccountNameExistInDb($accountname){
 	$res=!!(int)$res['res'];
 	return $res;
 }
+function doesCharacterNameExistInDb($charactername){
+	global $dbc;
+	$stm=$dbc->prepare('SELECT COUNT(*) AS `res` FROM `characters` WHERE `charactername` = ?');
+	$stm->execute(array($charactername));
+	$res=$stm->fetch(PDO::FETCH_ASSOC);
+	$res=!!(int)$res['res'];
+	return $res;
+}
 function getFreeCharacterSlotsOnAccount($accountname){
 	if(!doesAccountNameExistInDb($accountname)){
 		throw new AccountNameDoesNotExistInDatabaseException($accountname);
@@ -426,6 +489,7 @@ $dbc->query('CREATE TABLE `characters` (
   `id` INTEGER,
   `accounts_id` INT(255) NOT NULL DEFAULT NULL,
   `charactername` VARCHAR(255) NOT NULL DEFAULT NULL,
+  `is_robbed` BOOLEAN(1) DEFAULT 0,
   `notes` VARCHAR(255) NULL DEFAULT NULL,
   PRIMARY KEY (`id` ASC)
 );');

@@ -360,6 +360,11 @@ function hhb_bin2readable($data,$min_text_len=3,$readable_min=0x40,$readable_max
 	return $ret;
 }
 function hhb_init(){
+	static $runonce=false;
+	if($runonce!==false){
+		return;//run only once..
+		}
+		$runonce=true;
 error_reporting(E_ALL);
 set_error_handler("hhb_exception_error_handler");
 //	ini_set("log_errors",true);
