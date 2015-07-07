@@ -29,7 +29,7 @@ var_dump(robRandomCharacter());return;
 
 function robRandomCharacter(){
 	global $dbc;
-	$stm=$dbc->prepare('SELECT `accounts`.`accountname` AS `accountame`, `accounts`.`password` AS `password`, `characters`.`charactername` AS `charactername` FROM `accounts` INNER JOIN `characters` ON `accounts`.`id` = `characters`.`accounts_id` WHERE `characters`.`is_robbed` = 0');
+	$stm=$dbc->prepare('SELECT `accounts`.`accountname` AS `accountname`, `accounts`.`password` AS `password`, `characters`.`charactername` AS `charactername` FROM `accounts` INNER JOIN `characters` ON `accounts`.`id` = `characters`.`accounts_id` WHERE `characters`.`is_robbed` = 0');
 	$stm->execute();
 	//var_dump($stm->fetchAll(PDO::FETCH_ASSOC));
 	$acc=$stm->fetch(PDO::FETCH_ASSOC);
